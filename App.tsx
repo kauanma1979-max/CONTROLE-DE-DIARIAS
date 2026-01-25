@@ -349,20 +349,19 @@ const App: React.FC = () => {
 
           <section className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
             <h3 className="text-3xl font-bold mb-4 pb-2 border-b-2 border-[#FF2800] flex items-center gap-2">
-              <i className="fas fa-project-diagram text-[#FF2800]"></i> Status do Fluxo de Aprovação
+              <i className="fas fa-project-diagram text-[#FF2800]"></i> Fluxo de Aprovações Pendentes
             </h3>
-            <p className="mb-10 text-gray-600">Acompanhamento em tempo real dos estágios de aprovação para as solicitações mais recentes.</p>
+            <p className="mb-6 text-gray-600">Lista completa de rastreamento das etapas de aprovação para todas as solicitações não pagas.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-2">
               {timelineData.length === 0 ? (
-                <div className="col-span-full text-center py-10 text-gray-400">
+                <div className="text-center py-10 text-gray-400">
                   <i className="fas fa-calendar-times text-4xl mb-3"></i>
                   <p>Dados indisponíveis para gerar o fluxo de aprovação.</p>
                 </div>
               ) : (
                 timelineData
                   .sort((a, b) => (b.saidaOrigemDate?.getTime() || 0) - (a.saidaOrigemDate?.getTime() || 0))
-                  .slice(0, 8)
                   .map((item, index) => (
                     <WorkflowCard key={item.id + index} item={item} />
                   ))
@@ -402,56 +401,65 @@ const WorkflowCard: React.FC<{ item: TimelineItem }> = ({ item }) => {
   if (item.dataAprovChefe) completedSteps = 2;
   if (item.dataAprovOrdenador) completedSteps = 3;
 
-  const fillWidth = completedSteps === 0 ? '0%' : completedSteps === 1 ? '0%' : completedSteps === 2 ? '50%' : '100%';
+  const fillWidth = completedSteps <= 1 ? '0%' : completedSteps === 2 ? '50%' : '100%';
 
   return (
-    <div className="bg-[#fcfcfc] rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all border-l-4 border-l-[#FF2800]">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded mr-2 uppercase">ID: {item.id}</span>
-          <h4 className="font-black text-gray-800 text-sm uppercase mt-1">{item.destino}</h4>
-          <p className="text-[10px] text-gray-500 font-medium italic mt-0.5">{item.datasDeslocamento}</p>
+    <div className="bg-white rounded-md border border-gray-100 px-4 py-2 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 hover:border-[#FF2800]/30 group">
+      {/* Informações Básicas - Enxuto */}
+      <div className="flex-shrink-0 w-full md:w-56">
+        <div className="flex items-center gap-2">
+            <span className="text-[9px] font-black text-gray-400 bg-gray-50 px-1 py-0.5 rounded">#{item.id}</span>
+            <span className="text-[8px] font-bold text-[#FF2800] uppercase tracking-tighter">Pendente</span>
         </div>
-        <div className="text-right">
-          <div className="text-sm font-black text-[#FF2800]">R$ {item.valor}</div>
-          <div className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Pendente</div>
+        <h4 className="font-black text-gray-800 text-[11px] uppercase mt-0.5 truncate">{item.destino}</h4>
+        <p className="text-[9px] text-gray-500 font-medium">{item.datasDeslocamento}</p>
+      </div>
+
+      {/* Linha do Tempo Centralizada - Muito mais fina */}
+      <div className="flex-grow w-full">
+        <div className="relative h-12 flex items-center">
+          {/* Fundo da Barra - Mais discreta */}
+          <div className="absolute left-6 right-6 h-0.5 bg-gray-100 rounded-full z-0">
+             <div className="h-full bg-[#FF2800] rounded-full transition-all duration-700 shadow-[0_0_5px_rgba(255,40,0,0.4)]" style={{ width: fillWidth }}></div>
+          </div>
+
+          {/* Marcadores - Menores e mais elegantes */}
+          <div className="relative w-full flex justify-between z-10">
+            {steps.map((step, idx) => {
+              const isDone = !!step.date;
+              const isCurrent = (completedSteps === idx);
+              
+              return (
+                <div key={idx} className="flex flex-col items-center min-w-[70px]">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] border-2 bg-white transition-all
+                    ${isDone ? 'border-green-500 text-green-500' : isCurrent ? 'border-[#FF2800] text-[#FF2800] scale-110 shadow-sm' : 'border-gray-200 text-gray-200'}`}>
+                    <i className={`fas ${isDone ? 'fa-check' : step.icon}`}></i>
+                  </div>
+                  <div className="mt-1 text-center">
+                    <span className={`text-[7px] font-black uppercase block leading-none ${isDone ? 'text-green-600' : isCurrent ? 'text-[#FF2800]' : 'text-gray-300'}`}>
+                      {step.label}
+                    </span>
+                    <span className="text-[7px] text-gray-400 font-mono leading-tight">{step.date ? formatDate(step.date) : '--/--'}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="relative mt-8 mb-4 px-2">
-        {/* Progress Line */}
-        <div className="step-line">
-          <div className="step-fill" style={{ width: fillWidth }}></div>
-        </div>
-
-        {/* Dots */}
-        <div className="relative flex justify-between z-10">
-          {steps.map((step, idx) => {
-            const isDone = !!step.date;
-            const isCurrent = (completedSteps === idx);
-            
-            return (
-              <div key={idx} className="flex flex-col items-center">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] border-2 bg-white transition-all
-                  ${isDone ? 'border-green-500 text-green-500' : isCurrent ? 'border-[#FF2800] text-[#FF2800] shadow-[0_0_8px_rgba(255,40,0,0.3)] scale-110' : 'border-gray-200 text-gray-300'}`}>
-                  <i className={`fas ${isDone ? 'fa-check' : step.icon}`}></i>
-                </div>
-                <div className="absolute -bottom-7 w-20 text-center">
-                  <span className={`text-[8px] font-black uppercase block ${isDone ? 'text-green-600' : isCurrent ? 'text-[#FF2800]' : 'text-gray-400'}`}>
-                    {step.label}
-                  </span>
-                  <span className="text-[7px] text-gray-400 font-medium">{step.date ? formatDate(step.date) : '--/--/--'}</span>
-                </div>
-              </div>
-            );
-          })}
+      {/* Financeiro e Status - Direto ao ponto */}
+      <div className="flex-shrink-0 text-right min-w-[120px] border-l border-gray-50 pl-6 hidden md:block">
+        <div className="text-sm font-black text-gray-900 leading-none mb-1">R$ {item.valor}</div>
+        <div className="text-[8px] text-gray-400 italic truncate max-w-[120px] leading-tight">
+            {item.motivo}
         </div>
       </div>
-
-      <div className="mt-12 pt-3 border-t border-gray-50">
-        <p className="text-[9px] text-gray-400 leading-tight">
-          <i className="fas fa-info-circle mr-1 text-[#FF2800]/50"></i> {item.motivo}
-        </p>
+      
+      {/* Mobile Value Row */}
+      <div className="md:hidden w-full flex justify-between items-center pt-1 border-t border-gray-50">
+          <div className="text-[8px] text-gray-400 italic truncate flex-grow mr-4">{item.motivo}</div>
+          <div className="text-xs font-black text-gray-900 whitespace-nowrap">R$ {item.valor}</div>
       </div>
     </div>
   );
