@@ -15,19 +15,12 @@ const App: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState("Nenhum arquivo selecionado");
-  const [isDemo, setIsDemo] = useState(true);
 
   const hoje = new Date();
   const dataCorte = new Date();
   dataCorte.setDate(hoje.getDate() - 60);
 
   const addExampleData = useCallback(() => {
-    const exemploDiarias: Diaria[] = [
-      { id: "120875", nomeCredor: "ANDRE LUIZ DOS SANTOS", datasDeslocamento: "08/01/2026", valor: "69.16", status: "Pendente", motivo: "Fiscalização de agentes regulados", destino: "SÃO JOSÉ DOS CAMPOS" },
-      { id: "121110", nomeCredor: "ANDRE LUIZ DOS SANTOS", datasDeslocamento: "09/01/2026 a 10/01/2026", valor: "345.78", status: "Pendente", motivo: "Operação Direção Segura Integrada", destino: "CAMPINAS" },
-      { id: "121111", nomeCredor: "ANDRE LUIZ DOS SANTOS", datasDeslocamento: "12/01/2026", valor: "69.16", status: "Pendente", motivo: "Fiscalização e campanha educativa", destino: "SANTOS" }
-    ];
-
     const exemploTimeline: TimelineItem[] = [
       {
         id: "120875",
@@ -39,7 +32,8 @@ const App: React.FC = () => {
         destino: "SÃO JOSÉ DOS CAMPOS",
         dataSolicitacao: new Date(2026, 0, 8),
         dataAprovChefe: null,
-        dataAprovOrdenador: null
+        dataAprovOrdenador: null,
+        saidaOrigemDate: new Date(2026, 0, 8)
       },
       {
         id: "121110",
@@ -51,19 +45,22 @@ const App: React.FC = () => {
         destino: "CAMPINAS",
         dataSolicitacao: new Date(2026, 0, 11),
         dataAprovChefe: new Date(2026, 0, 11),
-        dataAprovOrdenador: null
+        dataAprovOrdenador: null,
+        saidaOrigemDate: new Date(2026, 0, 11)
       }
     ];
 
-    setDiarias(exemploDiarias);
+    setDiarias([
+      { ...exemploTimeline[0], status: "Pendente" },
+      { ...exemploTimeline[1], status: "Pendente" }
+    ]);
     setTimelineData(exemploTimeline);
     setStats({
-      totalDiarias: 3,
-      totalValor: 484.10,
+      totalDiarias: 2,
+      totalValor: 414.94,
       periodoAnalisado: 60,
       servidoresUnicos: 1
     });
-    setIsDemo(true);
   }, []);
 
   useEffect(() => {
@@ -76,7 +73,6 @@ const App: React.FC = () => {
 
     setFileName(file.name);
     setLoading(true);
-    setIsDemo(false);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -121,22 +117,17 @@ const App: React.FC = () => {
         if (h === "STATUS") colIndices["Status"] = index;
         if (h === "MOTIVO") colIndices["Motivo"] = index;
         if (h.includes("TOTAL PAGO")) colIndices["Total Pago"] = index;
-        
-        if (h === "DESTINO") {
-          colIndices["Destino"] = index;
-        }
+        if (h === "DESTINO") colIndices["Destino"] = index;
       }
     });
 
-    if (colIndices["Destino"] === undefined) {
-      colIndices["Destino"] = 15; // Coluna P
-    }
+    if (colIndices["Destino"] === undefined) colIndices["Destino"] = 15;
 
     const requiredCols = ["Saída Origem", "Data de Pagamento", "Valor à Pagar"];
     const missingCols = requiredCols.filter(col => colIndices[col] === undefined);
 
     if (missingCols.length > 0) {
-      alert("Não foram encontradas todas as colunas necessárias. Colunas faltantes: " + missingCols.join(", "));
+      alert("Não foram encontradas todas as colunas necessárias.");
       setLoading(false);
       return;
     }
@@ -151,92 +142,38 @@ const App: React.FC = () => {
     const credoresSet = new Set<string>();
 
     rows.forEach(row => {
-      try {
-        const saidaOrigemStr = row[colIndices["Saída Origem"]];
-        const chegadaDestinoStr = row[colIndices["Chegada Destino"]];
-        const dataPagamento = row[colIndices["Data de Pagamento"]];
-        const valorStr = row[colIndices["Valor à Pagar"]];
-        const totalPagoStr = row[colIndices["Total Pago"]];
-        const id = row[colIndices["Id"]] || "N/A";
-        const nomeCredor = row[colIndices["Nome Credor"]] || "N/A";
-        const status = row[colIndices["Status"]] || "N/A";
-        const motivo = row[colIndices["Motivo"]] || "N/A";
-        const destinoValue = row[colIndices["Destino"]] || "N/A";
-        const dataSolicitacaoStr = row[colIndices["Data Solicitação"]];
-        const dataAprovChefeStr = row[colIndices["Data Aprovação Chefe Imediato"]];
-        const dataAprovOrdenadorStr = row[colIndices["Data Aprovação Ordenador"]];
+      const saidaOrigemStr = row[colIndices["Saída Origem"]];
+      const dataPagamento = row[colIndices["Data de Pagamento"]];
+      const valorStr = row[colIndices["Valor à Pagar"]];
+      const saidaOrigemDate = parseDate(saidaOrigemStr);
 
-        const saidaOrigemDate = parseDate(saidaOrigemStr);
+      if (saidaOrigemDate && saidaOrigemDate >= sixtyDaysAgo) {
+        const naoPago = !dataPagamento || dataPagamento.toString().trim() === "" || dataPagamento.toString().trim().toUpperCase() === "N/A";
 
-        if (saidaOrigemDate && saidaOrigemDate >= sixtyDaysAgo) {
-          let naoPago = false;
-          if (!dataPagamento || 
-              dataPagamento.toString().trim() === "" || 
-              dataPagamento.toString().trim().toUpperCase() === "N/A") {
-            
-            if (totalPagoStr !== undefined && totalPagoStr !== null) {
-              const totalPago = parseFloat(totalPagoStr.toString().replace(/[^\d,.-]/g, '').replace(',', '.'));
-              if (totalPago === 0 || isNaN(totalPago)) {
-                naoPago = true;
-              }
-            } else {
-              naoPago = true;
-            }
-          }
+        if (naoPago) {
+          const valorNum = parseFloat(valorStr?.toString().replace(/[^\d,.-]/g, '').replace(',', '.') || "0");
+          valorTotal += valorNum;
 
-          if (naoPago) {
-            let valor = 0;
-            if (valorStr) {
-              const valorNum = parseFloat(valorStr.toString().replace(/[^\d,.-]/g, '').replace(',', '.'));
-              if (!isNaN(valorNum)) {
-                valor = valorNum;
-                valorTotal += valorNum;
-              }
-            }
+          const diariaBase = {
+            id: row[colIndices["Id"]]?.toString() || "N/A",
+            nomeCredor: row[colIndices["Nome Credor"]]?.toString() || "N/A",
+            datasDeslocamento: formatDate(saidaOrigemDate),
+            valor: valorNum.toFixed(2),
+            status: row[colIndices["Status"]]?.toString() || "N/A",
+            motivo: row[colIndices["Motivo"]]?.toString() || "N/A",
+            destino: row[colIndices["Destino"]]?.toString() || "N/A",
+            saidaOrigemDate
+          };
 
-            let datasDeslocamento = "";
-            if (saidaOrigemStr) {
-              const saidaDate = parseDate(saidaOrigemStr);
-              const chegadaDate = parseDate(chegadaDestinoStr);
-              const saidaFormatada = saidaDate ? formatDate(saidaDate) : saidaOrigemStr;
-              if (chegadaDate) {
-                const chegadaFormatada = formatDate(chegadaDate);
-                datasDeslocamento = saidaFormatada === chegadaFormatada ? saidaFormatada : `${saidaFormatada} a ${chegadaFormatada}`;
-              } else {
-                datasDeslocamento = saidaFormatada;
-              }
-            }
-
-            filteredDiarias.push({
-              id: id.toString(),
-              nomeCredor: nomeCredor.toString(),
-              datasDeslocamento,
-              valor: valor.toFixed(2),
-              status: status.toString(),
-              motivo: motivo.toString().length > 50 ? motivo.toString().substring(0, 50) + "..." : motivo.toString(),
-              destino: destinoValue.toString(),
-              saidaOrigemDate
-            });
-
-            credoresSet.add(nomeCredor.toString());
-
-            filteredTimeline.push({
-              id: id.toString(),
-              nomeCredor: nomeCredor.toString(),
-              datasDeslocamento,
-              valor: valor.toFixed(2),
-              status: status.toString(),
-              motivo: motivo.toString(),
-              destino: destinoValue.toString(),
-              dataSolicitacao: parseDate(dataSolicitacaoStr),
-              dataAprovChefe: parseDate(dataAprovChefeStr),
-              dataAprovOrdenador: parseDate(dataAprovOrdenadorStr),
-              saidaOrigemDate
-            });
-          }
+          filteredDiarias.push(diariaBase);
+          credoresSet.add(diariaBase.nomeCredor);
+          filteredTimeline.push({
+            ...diariaBase,
+            dataSolicitacao: parseDate(row[colIndices["Data Solicitação"]]),
+            dataAprovChefe: parseDate(row[colIndices["Data Aprovação Chefe Imediato"]]),
+            dataAprovOrdenador: parseDate(row[colIndices["Data Aprovação Ordenador"]])
+          });
         }
-      } catch (err) {
-        console.error("Erro na linha:", err);
       }
     });
 
@@ -272,21 +209,7 @@ const App: React.FC = () => {
         <input type="file" id="fileInput" className="hidden" accept=".xlsx, .xls, .csv" onChange={handleFileChange} />
         
         <div className="mt-4 text-gray-500 italic font-medium">{fileName}</div>
-        
-        <div className="mt-5 bg-blue-50 border border-blue-100 text-blue-800 p-4 rounded-lg flex items-start gap-3 text-left max-w-2xl mx-auto">
-          <i className="fas fa-info-circle text-xl mt-0.5"></i>
-          <div className="text-sm">
-            <strong>Análise Automatizada:</strong> O sistema identifica diárias dos últimos <strong>60 dias</strong> pendentes de pagamento. A cidade de destino é extraída automaticamente da <strong>Coluna P</strong>.
-          </div>
-        </div>
       </section>
-
-      {loading && (
-        <div className="text-center py-10">
-          <i className="fas fa-spinner fa-spin text-5xl text-[#FF2800] mb-4"></i>
-          <p className="font-medium">Cruzando dados da planilha...</p>
-        </div>
-      )}
 
       {!loading && (
         <div id="resultsSection">
@@ -307,88 +230,57 @@ const App: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead className="bg-[#FF2800] text-white">
                   <tr>
-                    <th className="p-4 text-sm font-bold uppercase tracking-wider">ID</th>
-                    <th className="p-4 text-sm font-bold uppercase tracking-wider">Cidade Destino</th>
-                    <th className="p-4 text-sm font-bold uppercase tracking-wider">Datas</th>
-                    <th className="p-4 text-sm font-bold uppercase tracking-wider">Valor</th>
-                    <th className="p-4 text-sm font-bold uppercase tracking-wider text-center">Status</th>
-                    <th className="p-4 text-sm font-bold uppercase tracking-wider">Motivo</th>
+                    <th className="p-4 text-xs font-bold uppercase">ID</th>
+                    <th className="p-4 text-xs font-bold uppercase">Cidade Destino</th>
+                    <th className="p-4 text-xs font-bold uppercase">Datas</th>
+                    <th className="p-4 text-xs font-bold uppercase">Valor</th>
+                    <th className="p-4 text-xs font-bold uppercase text-center">Status</th>
+                    <th className="p-4 text-xs font-bold uppercase">Motivo</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
-                  {diarias.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center p-12 text-gray-400">
-                        <i className="fas fa-check-double text-green-500 text-5xl mb-3 block"></i>
-                        Nenhuma pendência encontrada no período.
+                  {diarias.map((diaria, idx) => (
+                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="p-4 font-mono text-xs">{diaria.id}</td>
+                      <td className="p-4 font-bold text-gray-800 uppercase text-xs">{diaria.destino}</td>
+                      <td className="p-4 text-xs">{diaria.datasDeslocamento}</td>
+                      <td className="p-4 font-semibold text-xs text-red-600">R$ {diaria.valor}</td>
+                      <td className="p-4 text-center">
+                        <span className="bg-red-50 text-red-700 px-2 py-1 rounded text-[10px] font-bold uppercase">Pendente</span>
                       </td>
+                      <td className="p-4 text-[10px] text-gray-500 leading-tight">{diaria.motivo}</td>
                     </tr>
-                  ) : (
-                    diarias.map((diaria, idx) => (
-                      <tr key={diaria.id + idx} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
-                        <td className="p-4 font-mono text-sm">{diaria.id}</td>
-                        <td className="p-4 font-bold text-gray-800 uppercase text-xs">{diaria.destino}</td>
-                        <td className="p-4 text-xs whitespace-nowrap">{diaria.datasDeslocamento}</td>
-                        <td className="p-4 font-semibold text-sm">R$ {diaria.valor}</td>
-                        <td className="p-4 text-center">
-                          <span className="bg-red-50 text-red-700 px-2 py-1 rounded text-[10px] font-bold uppercase border border-red-100">
-                            Pendente
-                          </span>
-                        </td>
-                        <td className="p-4 text-[11px] text-gray-500 leading-tight">{diaria.motivo}</td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
           </section>
 
           <section className="mb-12">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <div>
-                    <h3 className="text-2xl font-bold flex items-center gap-2">
-                        <i className="fas fa-project-diagram text-[#FF2800]"></i> Fluxo de Aprovação Atual
-                    </h3>
-                    <p className="text-gray-500 text-sm mt-1">Rastreamento do estágio de aprovação para os 8 registros mais recentes.</p>
-                </div>
-                <div className="flex items-center gap-4 text-xs font-semibold">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500"></span> Concluído</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[#FF2800]"></span> Atual</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-300"></span> Pendente</span>
-                </div>
-            </div>
-            
+            <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                <i className="fas fa-project-diagram text-[#FF2800]"></i> Painel de Rastreamento de Aprovação
+            </h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {timelineData.length === 0 ? (
-                <div className="col-span-full text-center py-10 bg-white rounded-xl border border-gray-200 text-gray-400">
-                  <p>Aguardando processamento de dados para gerar o fluxo.</p>
-                </div>
-              ) : (
-                timelineData
-                  .sort((a, b) => (b.saidaOrigemDate?.getTime() || 0) - (a.saidaOrigemDate?.getTime() || 0))
-                  .slice(0, 8)
-                  .map((item, index) => (
-                    <WorkflowCard key={item.id + index} item={item} />
-                  ))
-              )}
+              {timelineData.slice(0, 8).map((item, index) => (
+                <WorkflowCard key={index} item={item} />
+              ))}
             </div>
           </section>
         </div>
       )}
 
-      <footer className="mt-12 pt-8 text-center text-gray-400 border-t border-gray-200 text-xs">
-        <p>Sistema de Monitoramento DETRAN/SP &copy; 2025 | Análise de 60 Dias | Cidade via Coluna P</p>
+      <footer className="mt-12 pt-8 text-center text-gray-400 border-t border-gray-200 text-xs uppercase tracking-widest font-bold">
+        <i className="fas fa-shield-alt mr-2"></i> DETRAN/SP - Monitoramento de Diárias
       </footer>
     </div>
   );
 };
 
 const StatCard: React.FC<{ icon: string, label: string, value: string | number }> = ({ icon, label, value }) => (
-  <div className="bg-white rounded-xl p-6 text-center border-b-4 border-[#FF2800] shadow-sm transition-all hover:shadow-md border-x border-t border-gray-100">
+  <div className="bg-white rounded-xl p-6 text-center border-b-4 border-[#FF2800] shadow-sm border-x border-t border-gray-100">
     <div className="text-2xl text-[#FF2800] mb-2"><i className={`fas ${icon}`}></i></div>
     <div className="text-3xl font-bold text-gray-900 my-1">{value}</div>
-    <div className="text-xs text-gray-400 font-bold uppercase tracking-widest">{label}</div>
+    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{label}</div>
   </div>
 );
 
@@ -399,78 +291,57 @@ const WorkflowCard: React.FC<{ item: TimelineItem }> = ({ item }) => {
     { label: 'Ordenador', date: item.dataAprovOrdenador, icon: 'fa-stamp' }
   ];
 
-  // Calculate percentage for progress fill
-  let completedSteps = 0;
-  if (item.dataSolicitacao) completedSteps = 1;
-  if (item.dataAprovChefe) completedSteps = 2;
-  if (item.dataAprovOrdenador) completedSteps = 3;
-  
-  const fillWidth = completedSteps === 0 ? '0%' : completedSteps === 1 ? '0%' : completedSteps === 2 ? '50%' : '100%';
-  const totalDays = calculateDaysBetween(item.dataSolicitacao, item.dataAprovOrdenador || new Date());
+  let currentStep = 0;
+  if (item.dataSolicitacao) currentStep = 1;
+  if (item.dataAprovChefe) currentStep = 2;
+  if (item.dataAprovOrdenador) currentStep = 3;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 transition-all hover:border-[#FF2800]/30 hover:shadow-lg group">
-      <div className="flex justify-between items-start mb-6">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:border-[#FF2800]/50 transition-all">
+      <div className="flex justify-between items-center mb-6">
         <div>
-            <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded uppercase tracking-tighter">ID {item.id}</span>
-                <span className="text-[10px] font-bold bg-red-50 text-[#FF2800] px-1.5 py-0.5 rounded uppercase">R$ {item.valor}</span>
-            </div>
-            <h4 className="text-sm font-bold uppercase text-gray-800">{item.destino}</h4>
-            <p className="text-[10px] text-gray-400 mt-0.5">{item.datasDeslocamento}</p>
+            <span className="text-[9px] font-black bg-gray-100 px-2 py-0.5 rounded text-gray-500 uppercase">PROCESSO {item.id}</span>
+            <h4 className="text-sm font-bold uppercase text-gray-800 mt-1">{item.destino}</h4>
         </div>
         <div className="text-right">
-            <span className="text-[10px] font-bold text-gray-500 block">DURAÇÃO</span>
-            <span className="text-sm font-bold text-[#FF2800]">{totalDays || 0} DIAS</span>
+            <span className="text-xs font-black text-red-600">R$ {item.valor}</span>
         </div>
       </div>
 
-      <div className="relative mb-10 mt-8">
-        {/* Progress Background Line */}
-        <div className="progress-line h-1 mx-6">
-            <div className="progress-fill" style={{ width: fillWidth }}></div>
-        </div>
-        
-        {/* Step Markers */}
-        <div className="relative z-10 flex justify-between">
-            {steps.map((step, i) => {
-                const isComplete = !!step.date;
-                const isCurrent = (completedSteps === i);
-                
-                let dotClass = "bg-white border-2 ";
-                let labelClass = "text-[9px] font-bold uppercase mt-2 text-center absolute -bottom-8 left-1/2 -translate-x-1/2 w-20 ";
-                
-                if (isComplete) {
-                    dotClass += "border-green-500 text-green-500";
-                    labelClass += "text-green-600";
-                } else if (isCurrent) {
-                    dotClass += "border-[#FF2800] text-[#FF2800] shadow-[0_0_8px_rgba(255,40,0,0.3)] scale-110";
-                    labelClass += "text-[#FF2800]";
-                } else {
-                    dotClass += "border-gray-200 text-gray-300";
-                    labelClass += "text-gray-400";
-                }
-
-                return (
-                    <div key={i} className="flex flex-col items-center relative">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs transition-all duration-300 ${dotClass}`}>
-                            <i className={`fas ${isComplete ? 'fa-check' : step.icon}`}></i>
-                        </div>
-                        <div className={labelClass}>
-                            {step.label}
-                            {step.date && <span className="block font-normal text-gray-400 normal-case">{formatDate(step.date)}</span>}
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
+      <div className="flex items-center justify-between gap-2 px-2 py-4 bg-gray-50 rounded-lg">
+        {steps.map((step, i) => {
+          const isDone = !!step.date;
+          const isCurrent = currentStep === i;
+          
+          return (
+            <React.Fragment key={i}>
+              <div className="flex flex-col items-center flex-1 relative">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs transition-all z-10
+                  ${isDone ? 'bg-green-500 text-white shadow-lg shadow-green-100' : 
+                    isCurrent ? 'bg-[#FF2800] text-white pulse-active' : 'bg-gray-200 text-gray-400'}`}>
+                  <i className={`fas ${isDone ? 'fa-check' : step.icon}`}></i>
+                </div>
+                <div className="mt-2 text-center">
+                    <span className={`text-[9px] font-bold block uppercase ${isDone ? 'text-green-600' : isCurrent ? 'text-[#FF2800]' : 'text-gray-400'}`}>
+                        {step.label}
+                    </span>
+                    <span className="text-[8px] text-gray-400 font-mono">{step.date ? formatDate(step.date) : '--/--/--'}</span>
+                </div>
+              </div>
+              {i < steps.length - 1 && (
+                <div className="flex-shrink-0 text-gray-300">
+                    <i className="fas fa-chevron-right text-[10px]"></i>
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
       
-      <div className="mt-12 pt-4 border-t border-gray-50 flex items-center justify-between">
-          <div className="text-[10px] font-medium text-gray-400 italic truncate max-w-[70%]">
+      <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
+          <span className="text-[9px] text-gray-400 italic truncate max-w-[80%]">
               <i className="fas fa-info-circle mr-1"></i> {item.motivo}
-          </div>
-          <button className="text-[10px] font-bold text-[#FF2800] hover:underline uppercase">Detalhes</button>
+          </span>
       </div>
     </div>
   );
