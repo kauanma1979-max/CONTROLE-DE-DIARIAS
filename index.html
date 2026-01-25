@@ -8,13 +8,23 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @keyframes pulse-red {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 40, 0, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(255, 40, 0, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 40, 0, 0); }
+        /* Helper classes for the new workflow visualization */
+        .step-line {
+            position: absolute;
+            top: 14px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: #e5e7eb;
+            z-index: 0;
         }
-        .pulse-active {
-            animation: pulse-red 2s infinite;
+        .step-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background-color: #FF2800;
+            transition: width 0.5s ease-in-out;
         }
     </style>
 <script type="importmap">
@@ -27,9 +37,7 @@
 }
 </script>
 </head>
-<body class="bg-[#fafafa] text-black leading-relaxed">
+<body class="bg-white text-black leading-relaxed">
     <div id="root"></div>
-    <!-- Tag crucial para o funcionamento no Vercel/Navegador -->
-    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
