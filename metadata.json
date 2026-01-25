@@ -1,0 +1,5 @@
+{
+  "name": "Controle de Diárias - DETRAN",
+  "description": "Sistema para análise e monitoramento de diárias pendentes do DETRAN/SP, com visualização de linha do tempo de aprovação e estatísticas detalhadas.",
+  "requestFramePermissions": []
+}
